@@ -38,7 +38,7 @@ def createTables(session) :
     session.execute("""
         CREATE TABLE IF NOT EXISTS StockOperation (
             OperationID uuid,
-            TimeCreated text,
+            TimeCreated timestamp,
             Username text,
             StockCode text,
             StockPrice decimal,
@@ -50,9 +50,10 @@ def createTables(session) :
     print('Create Table UserProfile...')
     session.execute("""
         CREATE TABLE IF NOT EXISTS UserProfile (
-            UserID int,
+            TimeCreated timestamp,
+            UserID uuid,
             Username text,
-            TimeCreated text,
+            Password text,
             Status int,
             PRIMARY KEY (UserID)
         )
@@ -62,10 +63,8 @@ def createTables(session) :
 def operationInsert(session, query, values) :
     session.set_keyspace(KEYSPACE)
     preparedQuery = session.prepare(query)
-    print('Query Prepared.')
     feedback = session.execute(preparedQuery.bind(values))
     # feedback = session.execute_async(preparedQuery.bind(values))
-    print('Query Executed.')
     return feedback
 
 def operationSelect(session, query) :

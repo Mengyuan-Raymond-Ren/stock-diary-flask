@@ -1,38 +1,35 @@
-from flask import Flask
-from flask import Response
-from flask import jsonify
-
 import sys
 sys.path.insert(0, 'models/')
 sys.path.insert(1, 'cqls/')
-
 import requests
 import json
+import BasicCQL
 
+from flask import Flask, Response, request, jsonify
+from flask_cors import CORS, cross_origin
 from cassandra import ConsistencyLevel
 from cassandra.cluster import Cluster
 from cassandra.query import SimpleStatement
-
-import BasicCQL
 from StockOperationModel import StockOperationModel
+from UserProfileModel import UserProfileModel
+
+app = Flask(__name__)
+CORS(app, resources=r'/*')
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 session = BasicCQL.createSession()
 BasicCQL.createKeySpace(session)
 BasicCQL.createTables(session)
 
-app = Flask(__name__)
-
 @app.route('/')
+@cross_origin(supports_credentials=True)
 def indexPage():
-    session = BasicCQL.createSession()
-    for i in range(9) :
-        stockOperationModel = StockOperationModel('2018-07-28 12:12:12', 'Ray', 'SLM', 11.28, i * 10, 1)
-        print('Get Query.')
-        query = stockOperationModel.getInsertQuery()
-        print('Get ValuesList.')
-        valuesList = stockOperationModel.getValuesAsList()
-        print('Perform Insert Operation.')
-        feedback = BasicCQL.operationInsert(session, query, valuesList)
+    # session = BasicCQL.createSession()
+    # for i in range(9) :
+    #     stockOperationModel = StockOperationModel('toTimestamp(now())', 'Ray', 'SLM', 11.28, i * 10, 1)
+    #     query = stockOperationModel.getInsertQuery()
+    #     valuesList = stockOperationModel.getValuesAsList()
+    #     feedback = BasicCQL.operationInsert(session, query, valuesList)
 
     # API_URL = "https://www.alphavantage.co/query"
 
@@ -45,21 +42,16 @@ def indexPage():
     #         fd.write(chunk)
     
     # BasicCQL.dropKeySpace(session)
-    return "Insert Sueccessful!"
+    return "Load Sueccessful!"
 
 @app.route('/user/<username>', methods=['GET'])
-def userPage(username):
+@cross_origin(supports_credentials=True)
+def retrieveUserInformationHandler(username):
     session = BasicCQL.createSession()
     stockOperationModel = StockOperationModel()
     feedback = BasicCQL.operationSelect(session, stockOperationModel.getSelectQuery([]))
     operations = {'TimeCreated': '', 'Username': '', 'StockCode': '', 'StockPrice': '', 'TradeVolume': '', 'TradeType': '', }
     for row in feedback :
-        print(row.timecreated)
-        print(row.username)
-        print(row.stockcode)
-        print(row.stockprice)
-        print(row.tradevolume)
-        print(row.tradetype)
         operations['TimeCreated'] += '%s,' % row.timecreated
         operations['Username'] += '%s,' % row.username
         operations['StockCode'] += '%s,' % row.stockcode
@@ -67,17 +59,24 @@ def userPage(username):
         operations['TradeVolume'] += '%d,' % row.tradevolume
         operations['TradeType'] += '%d,' % row.tradetype
     js = json.dumps(operations)
-
-    # data = {
-    #     'Timestamp': '2018-08-31', 
-    #     'UserID': userid, 
-    #     'StockCode': 'SLM', 
-    #     'StockPrice': 12.15, 
-    #     'TradeVolume': 10, 
-    #     'TradeType': 1,
-    # }
-    # js = json.dumps(data)
-
     resp = Response(js, status=200, mimetype='application/json')
     resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+@app.route('/user/register/', methods=['POST'])
+@cross_origin(supports_credentials=True, origin='http://127.0.0.1:5000/', headers=['Content-Type'])
+def registerUserHandler():
+    content = request.json
+    username = content['Username']
+    password = content['Password']
+    userProfileModel = UserProfileModel(username, password)
+
+    session = BasicCQL.createSession()
+    query = userProfileModel.getInsertQuery()
+    valuesList = userProfileModel.getValuesAsList()
+    feedback = BasicCQL.operationInsert(session, query, valuesList)
+    js = json.dumps({})
+    resp = Response(js, status=200, headers={'Access-Control-Allow-Origin': '*'}, mimetype='application/json')
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    # feedback = BasicCQL.operationSelect(session, userProfileModel.getSelectQuery([]))
     return resp
